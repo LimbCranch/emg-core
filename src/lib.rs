@@ -6,11 +6,18 @@
 #![doc = include_str!("../README.md")]
 //#![cfg_attr(not(feature = "std"), no_std)]
 
+pub mod processing;
+
+
 pub mod hal;
 pub mod config;
 pub mod acquisition;
 
 // Re-export commonly used types
+
+pub use processing::{FilterBank, ProcessingPipeline, QualityMonitor, WindowManager};
+
+
 pub use hal::{EmgDevice, EmgSample, DeviceInfo, DeviceCapabilities, QualityMetrics, DeviceType, ThreadPriority};
 pub use acquisition::{LockFreeRingBuffer, MpmcRingBuffer, SampleSynchronizer, BufferManager};
 
