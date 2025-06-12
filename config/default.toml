@@ -1,0 +1,49 @@
+﻿# config/default.toml
+# Default EMG system configuration
+
+[system]
+sampling_rate_hz = 2000
+channel_count = 8
+buffer_size_samples = 4096
+latency_target_ms = 20
+thread_priority = "realtime"
+
+[hal]
+device_type = "simulator"
+connection_timeout_ms = 5000
+retry_attempts = 3
+auto_reconnect = true
+
+[hal.simulator]
+profile = "healthy_user"
+noise_level = 0.05
+artifact_probability = 0.02
+channel_count = 8
+sample_rate_hz = 2000
+gesture_duration_ms = 1000
+
+[processing]
+[processing.filter_bank]
+highpass_cutoff_hz = 20.0
+lowpass_cutoff_hz = 500.0
+filter_order = 4
+filter_type = "butterworth"
+
+[processing.filter_bank.notch_filters]
+frequencies_hz = [50.0, 60.0]
+bandwidth_hz = 2.0
+
+[processing.quality_monitoring]
+snr_threshold_db = 20.0
+artifact_detection_enabled = true
+contact_impedance_max_kohm = 50.0
+saturation_threshold = 0.95
+
+[processing.windowing]
+window_size_samples = 256
+overlap_percent = 50.0
+window_type = "hamming"
+
+[communication]
+shared_memory_size_mb = 64
+message_queue_size = 1024

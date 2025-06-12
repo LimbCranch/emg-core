@@ -663,6 +663,7 @@ dependencies = [
  "redis",
  "rustfft",
  "serde",
+ "serde_json",
  "serial_test",
  "shared_memory",
  "tflitec",
