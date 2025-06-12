@@ -1,8 +1,13 @@
 ﻿// src/hal/tests.rs
 //! Unit tests for HAL components
+//! 
+
+use crate::hal::{EmgDevice, EmgSample, DeviceInfo, DeviceCapabilities, QualityMetrics , DeviceType};
+
 
 #[cfg(test)]
 mod tests {
+    use crate::ThreadPriority;
     use super::*;
 
     #[test]

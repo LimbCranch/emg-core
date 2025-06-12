@@ -84,7 +84,7 @@ impl SampleSynchronizer {
     }
 
     /// Add sample for specific channel
-    pub fn add_channel_sample(&self, channel_id: usize, value: f32) -> Result<(), String> {
+    pub fn add_channel_sample(&mut self, channel_id: usize, value: f32) -> Result<(), String> {
         if channel_id >= self.config.channel_count {
             return Err(format!("Invalid channel ID: {}", channel_id));
         }
@@ -139,7 +139,7 @@ impl SampleSynchronizer {
     }
 
     /// Add multi-channel sample at once
-    pub fn add_multi_channel_sample(&self, values: &[f32]) -> Result<(), String> {
+    pub fn add_multi_channel_sample(&mut self, values: &[f32]) -> Result<(), String> {
         if values.len() != self.config.channel_count {
             return Err(format!(
                 "Expected {} channels, got {}",
@@ -260,7 +260,7 @@ mod tests {
             channel_count: 4,
             ..Default::default()
         };
-        let sync = SampleSynchronizer::new(config).unwrap();
+        let mut sync = SampleSynchronizer::new(config).unwrap();
 
         let values = [0.1, 0.2, 0.3, 0.4];
         assert!(sync.add_multi_channel_sample(&values).is_ok());
@@ -277,7 +277,7 @@ mod tests {
             channel_count: 3,
             ..Default::default()
         };
-        let sync = SampleSynchronizer::new(config).unwrap();
+        let mut sync = SampleSynchronizer::new(config).unwrap();
 
         // Add samples channel by channel
         assert!(sync.add_channel_sample(0, 0.1).is_ok());
@@ -294,7 +294,7 @@ mod tests {
             channel_count: 2,
             ..Default::default()
         };
-        let sync = SampleSynchronizer::new(config).unwrap();
+        let mut sync = SampleSynchronizer::new(config).unwrap();
 
         let utilizations = sync.get_buffer_utilization();
         assert_eq!(utilizations.len(), 2);
@@ -311,7 +311,7 @@ mod tests {
             channel_count: 2,
             ..Default::default()
         };
-        let sync = SampleSynchronizer::new(config).unwrap();
+        let mut sync = SampleSynchronizer::new(config).unwrap();
 
         assert!(sync.add_channel_sample(2, 0.1).is_err()); // Channel 2 doesn't exist
         assert!(sync.add_multi_channel_sample(&[0.1, 0.2, 0.3]).is_err()); // Too many channels
@@ -323,7 +323,7 @@ mod tests {
             channel_count: 2,
             ..Default::default()
         };
-        let sync = SampleSynchronizer::new(config).unwrap();
+        let mut sync = SampleSynchronizer::new(config).unwrap();
 
         sync.add_multi_channel_sample(&[0.1, 0.2]).unwrap();
         assert!(sync.try_get_synchronized_sample().is_some());
