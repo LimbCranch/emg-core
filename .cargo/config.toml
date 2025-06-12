@@ -1,0 +1,8 @@
+﻿# emg-core/.cargo/config.toml
+[build]
+rustdocflags = [
+    "--enable-index-page",
+    "--generate-link-to-definition",
+    "--show-type-layout",
+    "--document-private-items"
+]
