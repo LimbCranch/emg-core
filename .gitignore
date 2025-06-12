@@ -1,0 +1,42 @@
+﻿# .gitignore for Rust
+/target/
+/Cargo.lock  # Remove this line for libraries
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated files
+*.orig
+*.rej
+
+# Embedded-specific
+*.bin
+*.hex
+*.elf
+*.map
+
+# Test artifacts
+/test_results/
+/coverage/
+
+# Benchmark results
+/target/criterion/
+
+# Configuration overrides
+config/local.toml
+config/secrets.toml
+
+# Large files (will use Git LFS)
+*.bin filter=lfs diff=lfs merge=lfs -text
+*.hex filter=lfs diff=lfs merge=lfs -text
+*.elf filter=lfs diff=lfs merge=lfs -text
+test_data/*.emg filter=lfs diff=lfs merge=lfs -text
+models/*.onnx filter=lfs diff=lfs merge=lfs -text
