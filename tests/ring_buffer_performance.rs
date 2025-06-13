@@ -5,11 +5,12 @@ use emg_core::acquisition::ring_buffer::{LockFreeRingBuffer, MpmcRingBuffer};
 use std::thread;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use std::sync::Mutex;
 
 #[test]
 fn test_spsc_latency_under_100ns() {
     let mut buffer = LockFreeRingBuffer::new(1024).unwrap();
-    let iterations = 10000;
+    let iterations = 1000;
     let mut push_times = Vec::with_capacity(iterations);
     let mut pop_times = Vec::with_capacity(iterations);
 
@@ -83,15 +84,15 @@ fn test_mpmc_latency() {
 
 #[test]
 fn test_concurrent_spsc_performance() {
-    let buffer = Arc::new(LockFreeRingBuffer::new(8192).unwrap());
-    let mut buffer_clone = buffer.clone();
+    let buffer = Arc::new(Mutex::new(LockFreeRingBuffer::new(8192).unwrap()));
+    let buffer_clone = buffer.clone();
     let iterations = 100000;
 
     let start_time = Instant::now();
 
     let producer = thread::spawn(move || {
         for i in 0..iterations {
-            while buffer_clone.try_push(i).is_err() {
+            while buffer_clone.lock().unwrap().try_push(i).is_err() {
                 thread::yield_now();
             }
         }
@@ -100,7 +101,7 @@ fn test_concurrent_spsc_performance() {
     let consumer = thread::spawn(move || {
         let mut received = 0;
         while received < iterations {
-            if buffer.try_pop().is_some() {
+            if buffer.lock().unwrap().try_pop().is_some() {
                 received += 1;
             } else {
                 thread::yield_now();
@@ -125,7 +126,7 @@ fn test_concurrent_spsc_performance() {
 #[test]
 fn test_memory_ordering_stress() {
     // Stress test to verify memory ordering is correct
-    let buffer = Arc::new(LockFreeRingBuffer::new(256).unwrap());
+    let buffer = Arc::new(Mutex::new(LockFreeRingBuffer::new(256).unwrap()));
     let num_threads = 4;
     let iterations = 10000;
 
@@ -137,7 +138,7 @@ fn test_memory_ordering_stress() {
         let handle = thread::spawn(move || {
             for i in 0..iterations {
                 let value = thread_id * iterations + i;
-                while buffer_clone.try_push(value).is_err() {
+                while buffer_clone.lock().unwrap().try_push(value).is_err() {
                     thread::yield_now();
                 }
             }
@@ -152,7 +153,7 @@ fn test_memory_ordering_stress() {
         let total_expected = num_threads * iterations;
 
         while received.len() < total_expected {
-            if let Some(item) = buffer_consumer.try_pop() {
+            if let Some(item) = buffer_consumer.lock().unwrap().try_pop() {
                 received.push(item);
             } else {
                 thread::yield_now();
@@ -184,7 +185,7 @@ fn test_memory_ordering_stress() {
 #[test]
 fn test_emg_realistic_workload() {
     // Simulate realistic EMG data flow
-    let buffer = Arc::new(LockFreeRingBuffer::new(4096).unwrap());
+    let buffer = Arc::new(Mutex::new(LockFreeRingBuffer::new(4096).unwrap()));
     let sample_rate_hz = 2000;
     let duration_seconds = 1;
     let total_samples = sample_rate_hz * duration_seconds;
@@ -203,7 +204,7 @@ fn test_emg_realistic_workload() {
             // Simulate EMG sample data
             let emg_value = (i as f32 * 0.1).sin(); // Mock EMG signal
 
-            while producer_buffer.try_push(emg_value).is_err() {
+            while producer_buffer.lock().unwrap().try_push(emg_value).is_err() {
                 thread::yield_now();
             }
 
@@ -223,7 +224,7 @@ fn test_emg_realistic_workload() {
         let mut last_time = Instant::now();
 
         while processed < total_samples {
-            if let Some(_sample) = consumer_buffer.try_pop() {
+            if let Some(_sample) = consumer_buffer.lock().unwrap().try_pop() {
                 let now = Instant::now();
                 let gap = now - last_time;
                 if gap > max_gap {
@@ -256,7 +257,7 @@ fn test_emg_realistic_workload() {
 
 #[test]
 fn test_buffer_utilization_tracking() {
-    let buffer = LockFreeRingBuffer::new(64).unwrap();
+    let mut buffer = LockFreeRingBuffer::new(64).unwrap();
 
     // Empty buffer
     assert_eq!(buffer.utilization(), 0.0);

@@ -90,7 +90,7 @@ async fn test_serial_device_creation() {
 #[tokio::test]
 async fn test_device_trait_object() {
     // Test that we can use devices through trait objects
-    let mut devices: Vec<Box<dyn EmgDevice<Error = Box<dyn std::error::Error + Send + Sync>>>> = Vec::new();
+   // let mut devices: Vec<Box<dyn EmgDevice<Error = Box<dyn std::error::Error + Send + Sync>>>> = Vec::new();
 
     // Note: We can't easily put different error types in the same Vec
     // This test shows the trait is object-safe for similar error types
