@@ -1,5 +1,5 @@
-// src/processing/filters/mod.rs
-//! Digital filters for EMG signal processing
+// src/processing/filters_v1/mod.rs
+//! Digital filters_v1 for EMG signal processing
 
 pub mod iir;
 pub mod fir;
@@ -27,7 +27,7 @@ pub enum BandType {
     Bandstop,
 }
 
-/// Filter coefficients for IIR filters
+/// Filter coefficients for IIR filters_v1
 #[derive(Debug, Clone)]
 pub struct IirCoefficients {
     pub b: Vec<f32>, // Numerator coefficients

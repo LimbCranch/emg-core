@@ -1,5 +1,5 @@
-// src/processing/filters/iir.rs
-//! IIR (Infinite Impulse Response) digital filters
+// src/processing/filters_v1/iir.rs
+//! IIR (Infinite Impulse Response) digital filters_v1
 
 use super::{FilterError, BandType, IirCoefficients};
 

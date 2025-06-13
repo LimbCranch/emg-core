@@ -1,8 +1,8 @@
 ﻿// src/processing/filter_bank.rs
-//! Filter bank combining multiple filters
+//! Filter bank combining multiple filters_v1
 
 use crate::config::processing_config::{FilterBankConfig};
-use crate::processing::filters::{IirFilter, NotchFilter, FilterError, BandType};
+use crate::processing::filters_v1::{IirFilter, NotchFilter, FilterError, BandType};
 
 /// Filter bank with multiple stages
 pub struct FilterBank {
@@ -46,7 +46,7 @@ impl FilterBank {
             bank.lowpass = Some(lowpass);
         }
 
-        // Create notch filters
+        // Create notch filters_v1
         for &freq in &config.notch_filters.frequencies_hz {
             if freq > 0.0 && freq < sample_rate / 2.0 {
                 let notch = NotchFilter::new(freq, config.notch_filters.bandwidth_hz, sample_rate)?;
@@ -76,7 +76,7 @@ impl FilterBank {
             output = lowpass.process_sample(output);
         }
 
-        // Apply all notch filters
+        // Apply all notch filters_v1
         for notch in &mut self.notch_filters {
             output = notch.process_sample(output);
         }

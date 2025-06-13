@@ -1,5 +1,5 @@
-// src/processing/filters/fir.rs
-//! FIR (Finite Impulse Response) digital filters
+// src/processing/filters_v1/fir.rs
+//! FIR (Finite Impulse Response) digital filters_v1
 
 use super::FilterError;
 

@@ -6,6 +6,7 @@ pub mod schema_validator;
 pub mod loader;
 pub mod device_config;
 pub mod processing_config;
+pub(crate) mod processing;
 
 pub use constants::*;
 pub use schema_validator::{SchemaValidator, ValidationError};

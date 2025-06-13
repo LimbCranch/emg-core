@@ -56,7 +56,7 @@ lowpass_cutoff_hz = 500.0    # Low-pass filter cutoff
 filter_order = 4             # Filter order (1-8)
 filter_type = "butterworth"  # Options: butterworth, chebyshev1, chebyshev2, elliptic
 
-# Notch filters for powerline interference
+# Notch filters_v1 for powerline interference
 [processing.filter_bank.notch_filters]
 frequencies_hz = [50.0, 60.0]  # Frequencies to notch out
 bandwidth_hz = 2.0             # Notch bandwidth
@@ -130,5 +130,5 @@ export_interval_hours = 24      # Export interval
 [features]
 enable_ml_acceleration = false  # Enable ML hardware acceleration
 enable_cloud_sync = false       # Enable cloud synchronization
-enable_advanced_filters = false # Enable experimental filters
+enable_advanced_filters = false # Enable experimental filters_v1
 enable_gesture_prediction = false # Enable gesture prediction

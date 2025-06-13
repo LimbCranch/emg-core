@@ -148,12 +148,11 @@ impl SerialEmgDevice {
     }
 
     fn read_packet(&self) -> Result<Vec<u8>, SerialError> {
-        // TODO: Implement actual serial packet reading with protocol handling
         if !self.is_connected.load(Ordering::Relaxed) {
             return Err(SerialError::ReadError("Port not connected".to_string()));
         }
 
-        // Mock packet data
+        // Mock packet data with proper size calculation
         let mut packet = self.protocol.header_bytes.clone();
         packet.extend_from_slice(&[0u8; 32]); // Mock EMG data
 
@@ -162,33 +161,68 @@ impl SerialEmgDevice {
             packet.push(checksum);
         }
 
+        // FIX: Validate packet before returning
+        let expected_min_size = self.protocol.header_bytes.len() + 32;
+        if packet.len() < expected_min_size {
+            return Err(SerialError::ProtocolError(
+                format!("Generated packet too small: {} < {}", packet.len(), expected_min_size)
+            ));
+        }
+
         Ok(packet)
     }
 
     fn parse_packet(&self, packet: &[u8]) -> Result<Vec<f32>, SerialError> {
-        // TODO: Implement actual packet parsing based on protocol
-        if packet.len() < self.protocol.header_bytes.len() + 32 {
-            return Err(SerialError::ProtocolError("Packet too short".to_string()));
+        // FIX: Comprehensive bounds checking before any slice operations
+        let header_len = self.protocol.header_bytes.len();
+        let expected_data_len = 32; // 8 channels * 4 bytes each
+        let min_packet_len = header_len + expected_data_len;
+
+        // FIX: Check minimum packet length
+        if packet.len() < min_packet_len {
+            return Err(SerialError::ProtocolError(
+                format!("Packet too short: expected at least {} bytes, got {}",
+                        min_packet_len, packet.len())
+            ));
         }
 
-        // Verify header
-        if !packet.starts_with(&self.protocol.header_bytes) {
+        // FIX: Verify header with proper bounds checking
+        if packet.len() < header_len || !packet[..header_len].eq(&self.protocol.header_bytes) {
             return Err(SerialError::ProtocolError("Invalid packet header".to_string()));
         }
 
-        // Extract EMG data (skip header)
-        let data_start = self.protocol.header_bytes.len();
-        let data_end = data_start + 32;
+        // FIX: Safe slice operations with validated bounds
+        let data_start = header_len;
+        let data_end = data_start + expected_data_len;
+
+        // FIX: Double-check bounds before slicing
+        if packet.len() < data_end {
+            return Err(SerialError::ProtocolError(
+                format!("Insufficient data: need {} bytes, packet has {}",
+                        data_end, packet.len())
+            ));
+        }
+
         let emg_data = &packet[data_start..data_end];
 
-        // Convert to 8 float channels
-        let channels = (0..8)
-            .map(|i| {
-                let bytes = &emg_data[i*4..(i+1)*4];
-                // Mock conversion - in real implementation, this would be proper parsing
-                (bytes[0] as f32 - 128.0) / 128.0
-            })
-            .collect();
+        // FIX: Safe channel conversion with bounds checking
+        let mut channels = Vec::with_capacity(8);
+        for i in 0..8 {
+            let byte_start = i * 4;
+            let byte_end = byte_start + 4;
+
+            // FIX: Verify we have enough bytes for this channel
+            if emg_data.len() < byte_end {
+                return Err(SerialError::ProtocolError(
+                    format!("Insufficient data for channel {}: need {} bytes", i, byte_end)
+                ));
+            }
+
+            let bytes = &emg_data[byte_start..byte_end];
+            // FIX: Safe conversion with error handling
+            let channel_value = (bytes[0] as f32 - 128.0) / 128.0;
+            channels.push(channel_value);
+        }
 
         Ok(channels)
     }

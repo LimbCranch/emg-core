@@ -3,7 +3,7 @@
 
 use crate::hal::{EmgDevice, EmgSample, DeviceInfo, DeviceCapabilities, QualityMetrics};
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::error::Error;
 use std::fmt;
@@ -38,6 +38,8 @@ pub struct SimulatorDevice {
     sample_generator: SampleGenerator,
     is_running: AtomicBool,
     sequence_counter: AtomicU32,
+    last_timestamp: AtomicU64,
+    start_time: Option<u64>,
 }
 
 /// Internal sample generator for realistic EMG data
@@ -84,11 +86,17 @@ impl SimulatorDevice {
     pub fn new(config: SimulatorConfig) -> Result<Self, SimulatorError> {
         let sample_generator = SampleGenerator::new(&config)?;
 
+        let current_time = Self::get_current_timestamp();
+
+
         Ok(Self {
             config,
             sample_generator,
             is_running: AtomicBool::new(false),
             sequence_counter: AtomicU32::new(0),
+            last_timestamp: AtomicU64::new(current_time),
+            start_time: Some(current_time),
+
         })
     }
 
@@ -103,6 +111,11 @@ impl SimulatorDevice {
             .unwrap_or_default()
             .as_nanos() as u64
     }
+
+    fn sample_period_nanos(&self) -> u64 {
+        1_000_000_000 / self.config.sample_rate_hz as u64
+    }
+    
 }
 
 impl EmgDevice for SimulatorDevice {
@@ -114,6 +127,10 @@ impl EmgDevice for SimulatorDevice {
     }
 
     async fn start_acquisition(&mut self) -> Result<(), Self::Error> {
+        // FIX: Reset timestamp when starting acquisition
+        let current_time = Self::get_current_timestamp();
+        self.last_timestamp.store(current_time, Ordering::Relaxed);
+        self.sequence_counter.store(0, Ordering::Relaxed);
         self.is_running.store(true, Ordering::Relaxed);
         Ok(())
     }
@@ -129,7 +146,10 @@ impl EmgDevice for SimulatorDevice {
         }
 
         let sequence = self.sequence_counter.fetch_add(1, Ordering::Relaxed);
-        let timestamp = Self::get_current_timestamp();
+        let timestamp = self.last_timestamp.fetch_add(
+            self.sample_period_nanos(),
+            Ordering::Relaxed
+        );
 
         let channels = self.sample_generator.generate_channels()?;
         let quality_indicators = self.sample_generator.generate_quality_metrics(&channels);

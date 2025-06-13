@@ -12,10 +12,12 @@ pub mod processing;
 pub mod hal;
 pub mod config;
 pub mod acquisition;
-
+mod error;
+mod validation;
+pub mod utils;
 // Re-export commonly used types
 
-pub use processing::{FilterBank, ProcessingPipeline, QualityMonitor, WindowManager};
+pub use processing::{FilterBank, QualityMonitor, WindowManager};
 
 
 pub use hal::{EmgDevice, EmgSample, DeviceInfo, DeviceCapabilities, QualityMetrics, DeviceType, ThreadPriority};

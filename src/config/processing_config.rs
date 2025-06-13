@@ -131,7 +131,7 @@ pub fn validate_processing_config(config: &ProcessingConfig) -> Result<(), Strin
         return Err("Filter order must be greater than 0".to_string());
     }
 
-    // Validate notch filters
+    // Validate notch filters_v1
     for &freq in &config.filter_bank.notch_filters.frequencies_hz {
         if freq <= 0.0 {
             return Err("Notch filter frequencies must be positive".to_string());

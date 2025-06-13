@@ -1,5 +1,5 @@
-// src/processing/filters/notch.rs
-//! Notch filters for powerline interference removal
+// src/processing/filters_v1/notch.rs
+//! Notch filters_v1 for powerline interference removal
 
 use super::FilterError;
 
@@ -39,7 +39,7 @@ impl NotchFilter {
         })
     }
 
-    /// Create multiple notch filters for powerline harmonics
+    /// Create multiple notch filters_v1 for powerline harmonics
     pub fn powerline_harmonics(base_freq: f32, bandwidth: f32, sample_rate: f32, harmonics: usize) -> Result<Self, FilterError> {
         let mut sections = Vec::new();
 
