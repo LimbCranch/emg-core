@@ -1,49 +1,134 @@
 ﻿# config/default.toml
-# Default EMG system configuration
+# Enhanced EMG system configuration with validation
 
 [system]
-sampling_rate_hz = 2000
-channel_count = 8
-buffer_size_samples = 4096
-latency_target_ms = 20
-thread_priority = "realtime"
+# Signal acquisition settings
+sampling_rate_hz = 2000  # Must be between 500-10000 Hz
+channel_count = 8        # Must be between 1-32
+buffer_size_samples = 4096  # Auto-calculated if not specified
+latency_target_ms = 20   # Must be between 1-100 ms
+thread_priority = "realtime"  # Options: normal, high, realtime
+enable_safety_monitoring = true
+watchdog_timeout_ms = 100
 
 [hal]
-device_type = "simulator"
-connection_timeout_ms = 5000
-retry_attempts = 3
-auto_reconnect = true
+# Hardware abstraction layer
+device_type = "simulator"  # Options: simulator, usb, serial, bluetooth
+connection_timeout_ms = 5000  # Connection timeout
+retry_attempts = 3       # Maximum retry attempts
+auto_reconnect = true    # Enable automatic reconnection
+device_scan_timeout_ms = 10000  # Device discovery timeout
 
+# Simulator-specific configuration
 [hal.simulator]
-profile = "healthy_user"
-noise_level = 0.05
-artifact_probability = 0.02
+profile = "healthy_user"  # Simulation profile
+noise_level = 0.05       # Noise level (0.0-1.0)
+artifact_probability = 0.02  # Artifact probability (0.0-1.0)
 channel_count = 8
 sample_rate_hz = 2000
 gesture_duration_ms = 1000
 
+# USB device configuration (when device_type = "usb")
+[hal.usb]
+vendor_id = 0x1234
+product_id = 0x5678
+interface_number = 0
+timeout_ms = 1000
+buffer_size = 1024
+
+# Serial device configuration (when device_type = "serial")
+[hal.serial]
+port_name = "/dev/ttyUSB0"  # Platform-specific
+baud_rate = 115200
+data_bits = 8
+stop_bits = 1
+parity = "none"  # Options: none, odd, even
+timeout_ms = 1000
+flow_control = "none"  # Options: none, software, hardware
+
 [processing]
+# Signal processing pipeline configuration
+
+# Filter bank settings
 [processing.filter_bank]
-highpass_cutoff_hz = 20.0
-lowpass_cutoff_hz = 500.0
-filter_order = 4
-filter_type = "butterworth"
+highpass_cutoff_hz = 20.0    # High-pass filter cutoff
+lowpass_cutoff_hz = 500.0    # Low-pass filter cutoff
+filter_order = 4             # Filter order (1-8)
+filter_type = "butterworth"  # Options: butterworth, chebyshev1, chebyshev2, elliptic
 
+# Notch filters for powerline interference
 [processing.filter_bank.notch_filters]
-frequencies_hz = [50.0, 60.0]
-bandwidth_hz = 2.0
+frequencies_hz = [50.0, 60.0]  # Frequencies to notch out
+bandwidth_hz = 2.0             # Notch bandwidth
 
+# Signal quality monitoring
 [processing.quality_monitoring]
-snr_threshold_db = 20.0
-artifact_detection_enabled = true
-contact_impedance_max_kohm = 50.0
-saturation_threshold = 0.95
+snr_threshold_db = 20.0              # Minimum SNR threshold (0-60 dB)
+artifact_detection_enabled = true   # Enable artifact detection
+contact_impedance_max_kohm = 50.0   # Maximum acceptable impedance
+saturation_threshold = 0.95          # Signal saturation threshold (0.1-1.0)
 
+# Windowing for feature extraction
 [processing.windowing]
-window_size_samples = 256
-overlap_percent = 50.0
-window_type = "hamming"
+window_size_samples = 256      # Window size (16-8192)
+overlap_percent = 50.0         # Window overlap (0-99%)
+window_type = "hamming"        # Options: rectangular, hamming, hanning, blackman, kaiser
 
 [communication]
-shared_memory_size_mb = 64
-message_queue_size = 1024
+# Inter-process communication settings
+shared_memory_size_mb = 64      # Shared memory size
+message_queue_size = 1024       # Message queue depth
+max_message_size_bytes = 65536  # Maximum message size
+heartbeat_interval_ms = 1000    # Heartbeat interval
+enable_compression = false      # Enable message compression
+
+# Advanced configuration sections
+[advanced]
+# Performance tuning
+enable_simd = true              # Enable SIMD optimizations
+enable_multithreading = true    # Enable multi-threading
+cpu_affinity = []               # CPU cores to bind to (empty = auto)
+
+# Debugging and logging
+log_level = "info"              # Options: error, warn, info, debug, trace
+enable_performance_metrics = true
+enable_signal_logging = false   # Warning: generates large files
+metrics_export_interval_ms = 5000
+
+# Safety and monitoring
+[safety]
+emergency_stop_enabled = true
+max_force_newtons = 50.0        # Maximum force limit
+position_limits_enabled = true
+thermal_monitoring_enabled = true
+max_temperature_celsius = 70.0
+
+# Calibration settings
+[calibration]
+auto_calibration_enabled = true
+calibration_interval_minutes = 60  # Auto-calibration interval
+drift_detection_threshold = 0.1    # Signal drift threshold
+baseline_adaptation_rate = 0.001   # Baseline adaptation rate
+
+# User interface preferences
+[ui]
+theme = "dark"                  # Options: light, dark, auto
+language = "en"                 # Language code
+update_frequency_hz = 60        # UI update frequency
+enable_animations = true
+show_debug_info = false
+
+# Data recording and export
+[data]
+enable_recording = false        # Enable automatic recording
+recording_format = "csv"        # Options: csv, hdf5, binary
+max_recording_size_mb = 1000    # Maximum recording file size
+auto_export_enabled = false     # Enable automatic export
+export_interval_hours = 24      # Export interval
+
+# Feature flags for experimental features
+[features]
+enable_ml_acceleration = false  # Enable ML hardware acceleration
+enable_cloud_sync = false       # Enable cloud synchronization
+enable_advanced_filters = false # Enable experimental filters
+enable_gesture_prediction = false # Enable gesture prediction
