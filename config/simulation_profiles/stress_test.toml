@@ -1,0 +1,58 @@
+﻿# Stress test simulation profile
+# Location: config/simulation_profiles/stress_test.toml
+
+[profile]
+name = "stress_test"
+description = "Challenging conditions for system stress testing"
+
+[muscle_characteristics]
+fiber_composition = "Elderly"
+strength_level = "Low"
+fatigue_resistance = "Low"
+neural_efficiency = 0.60
+
+[noise_characteristics]
+environment_type = "Industrial"
+electrode_quality = "Poor"
+signal_conditioning = "Consumer"
+
+[simulation_config]
+profile_name = "stress_test"
+sample_rate_hz = 2000
+channel_count = 8
+
+[simulation_config.muscle_config]
+fiber_recruitment_curve = 0.24
+maximum_voluntary_contraction = 0.6
+fatigue_rate = 0.02
+recovery_rate = 0.03
+
+[simulation_config.noise_config]
+thermal_noise_power_dbm = -55.0
+powerline_frequency_hz = 50.0
+powerline_amplitude_factor = 0.05
+electrode_impedance_base = 15000.0
+electrode_impedance_variance = 5000.0
+
+[simulation_config.artifact_config]
+motion_artifact_probability = 0.030
+motion_artifact_amplitude = 0.25
+electrode_pop_probability = 0.002
+cable_movement_probability = 0.015
+
+[[gesture_library]]
+gesture_type = "HandClose"
+variability_factor = 0.30
+success_rate = 0.76
+
+
+[[gesture_library]]
+gesture_type = "HandOpen"
+variability_factor = 0.40
+success_rate = 0.74
+
+[gesture_library.activation_profile]
+onset_time_ms = 120.0
+peak_time_ms = 250.0
+offset_time_ms = 180.0
+amplitude_consistency = 0.60

@@ -9,6 +9,7 @@ pub mod serial_driver;
 
 #[cfg(test)]
 mod tests;
+mod simulation;
 
 pub use traits::*;
 pub use types::*;

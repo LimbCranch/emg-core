@@ -1,0 +1,58 @@
+﻿# Amputee baseline simulation profile
+# Location: config/simulation_profiles/amputee_baseline.toml
+
+[profile]
+name = "amputee_baseline"
+description = "Below-elbow amputee with good residual muscle function"
+
+[muscle_characteristics]
+fiber_composition = "Balanced"
+strength_level = "Normal"
+fatigue_resistance = "High"
+neural_efficiency = 0.75
+
+[noise_characteristics]
+environment_type = "Home"
+electrode_quality = "Consumer"
+signal_conditioning = "Consumer"
+
+[simulation_config]
+profile_name = "amputee_baseline"
+sample_rate_hz = 2000
+channel_count = 8
+
+[simulation_config.muscle_config]
+fiber_recruitment_curve = 0.30
+maximum_voluntary_contraction = 1.0
+fatigue_rate = 0.005
+recovery_rate = 0.08
+
+[simulation_config.noise_config]
+thermal_noise_power_dbm = -60.0
+powerline_frequency_hz = 50.0
+powerline_amplitude_factor = 0.02
+electrode_impedance_base = 8000.0
+electrode_impedance_variance = 2000.0
+
+[simulation_config.artifact_config]
+motion_artifact_probability = 0.015
+motion_artifact_amplitude = 0.15
+electrode_pop_probability = 0.0005
+cable_movement_probability = 0.0075
+
+[[gesture_library]]
+gesture_type = "HandClose"
+variability_factor = 0.18
+success_rate = 0.90
+
+
+[[gesture_library]]
+gesture_type = "HandOpen"
+variability_factor = 0.24
+success_rate = 0.87
+
+[gesture_library.activation_profile]
+onset_time_ms = 132.0
+peak_time_ms = 275.0
+offset_time_ms = 198.0
+amplitude_consistency = 0.81

@@ -667,6 +667,7 @@ dependencies = [
  "parking_lot",
  "proptest",
  "prost",
+ "rand 0.8.5",
  "redis",
  "rustfft",
  "serde",
