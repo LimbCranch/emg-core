@@ -2,7 +2,6 @@
 //! Location: src/hal/simulation/config.rs
 
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SimulationConfig {

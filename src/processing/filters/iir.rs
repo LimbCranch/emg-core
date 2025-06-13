@@ -1,7 +1,7 @@
 // src/processing/filters/iir.rs
 //! IIR (Infinite Impulse Response) digital filters
 
-use super::{FilterError, FilterType, BandType, IirCoefficients};
+use super::{FilterError, BandType, IirCoefficients};
 
 /// IIR filter with configurable parameters
 pub struct IirFilter {

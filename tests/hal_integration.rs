@@ -105,7 +105,7 @@ async fn test_device_trait_object() {
 
 #[tokio::test]
 async fn test_configuration_loading() {
-    let loader = ConfigLoader::new();
+    let mut loader = ConfigLoader::new();
 
     // Should be able to load default configuration
     let config = loader.load_system_config().expect("Failed to load config");

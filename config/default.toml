@@ -3,17 +3,17 @@
 
 [system]
 # Signal acquisition settings
-sampling_rate_hz = 2000  # Must be between 500-10000 Hz
-channel_count = 8        # Must be between 1-32
+sampling_rate_hz = 10000  # Must be between 500-10000 Hz
+channel_count = 32        # Must be between 1-32
 buffer_size_samples = 4096  # Auto-calculated if not specified
-latency_target_ms = 20   # Must be between 1-100 ms
+latency_target_ms = 10   # Must be between 1-100 ms
 thread_priority = "realtime"  # Options: normal, high, realtime
 enable_safety_monitoring = true
 watchdog_timeout_ms = 100
 
 [hal]
 # Hardware abstraction layer
-device_type = "simulator"  # Options: simulator, usb, serial, bluetooth
+device_type = "Simulator"  # Options: simulator, usb, serial, bluetooth
 connection_timeout_ms = 5000  # Connection timeout
 retry_attempts = 3       # Maximum retry attempts
 auto_reconnect = true    # Enable automatic reconnection
@@ -21,10 +21,10 @@ device_scan_timeout_ms = 10000  # Device discovery timeout
 
 # Simulator-specific configuration
 [hal.simulator]
-profile = "healthy_user"  # Simulation profile
-noise_level = 0.05       # Noise level (0.0-1.0)
+profile = "stress_test"  # Simulation profile
+noise_level = 0.8       # Noise level (0.0-1.0)
 artifact_probability = 0.02  # Artifact probability (0.0-1.0)
-channel_count = 8
+channel_count = 32
 sample_rate_hz = 2000
 gesture_duration_ms = 1000
 
@@ -42,9 +42,9 @@ port_name = "/dev/ttyUSB0"  # Platform-specific
 baud_rate = 115200
 data_bits = 8
 stop_bits = 1
-parity = "none"  # Options: none, odd, even
+parity = "None"  # Options: none, odd, even
 timeout_ms = 1000
-flow_control = "none"  # Options: none, software, hardware
+flow_control = "None"  # Options: none, software, hardware
 
 [processing]
 # Signal processing pipeline configuration

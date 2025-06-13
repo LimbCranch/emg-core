@@ -1,7 +1,7 @@
 // src/processing/filters/notch.rs
 //! Notch filters for powerline interference removal
 
-use super::{FilterError, IirFilter, IirCoefficients};
+use super::FilterError;
 
 /// Notch filter for removing specific frequency
 pub struct NotchFilter {

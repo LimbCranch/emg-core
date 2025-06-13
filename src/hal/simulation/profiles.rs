@@ -1,10 +1,9 @@
 ﻿//! Predefined simulation profiles for different scenarios
 //! Location: src/hal/simulation/profiles.rs
 
+use super::config::{ArtifactConfig, MuscleConfig, NoiseConfig, SimulationConfig};
 use crate::hal::types::GestureType;
-use super::config::{SimulationConfig, MuscleConfig, NoiseConfig, ArtifactConfig};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SimulationProfile {

@@ -31,7 +31,7 @@ fn demonstrate_ring_buffer() -> Result<(), Box<dyn std::error::Error>> {
     println!("📊 Demo 1: Lock-Free Ring Buffer Performance");
     println!("--------------------------------------------");
 
-    let buffer = LockFreeRingBuffer::new(1024)?;
+    let mut buffer = LockFreeRingBuffer::new(1024)?;
     println!("Created ring buffer with capacity: {}", buffer.capacity());
 
     // Performance test
@@ -325,7 +325,7 @@ async fn demonstrate_realtime_pipeline() -> Result<(), Box<dyn std::error::Error
     // Performance verification
     let performance_ok = actual_sample_rate > 1900.0 && // 95% of target rate
         metrics.average_latency_ns < 50_000 && // <50μs average latency
-        metrics.samples_dropped < (produced_count / 100); // <1% drop rate
+        metrics.samples_dropped < (produced_count / 100) as u64; // <1% drop rate
 
     if performance_ok {
         println!("  ✅ Real-time performance targets met!");

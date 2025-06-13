@@ -1,12 +1,11 @@
 ﻿// src/config/loader.rs
 //! Enhanced configuration loader with validation and hot reload
 
-use crate::config::{SystemConfig, schema_validator::SchemaValidator, constants::paths};
+use crate::config::{constants::paths, schema_validator::SchemaValidator, SystemConfig};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock, mpsc};
+use std::sync::{mpsc, Arc, RwLock};
 use std::thread;
 use std::time::{Duration, SystemTime};
-use notify::{Watcher, RecursiveMode, DebouncedEvent};
 
 /// Configuration loader with hot reload capabilities
 pub struct ConfigLoader {
@@ -101,7 +100,10 @@ impl ConfigLoader {
     }
 
     /// Setup hot reload with change notifications
-    pub fn enable_hot_reload(&mut self, callback: impl Fn(SystemConfig) + Send + 'static) -> Result<(), ConfigError> {
+    pub fn enable_hot_reload(
+        &mut self,
+        callback: impl Fn(SystemConfig) + Send + 'static,
+    ) -> Result<(), ConfigError> {
         let (tx, rx) = mpsc::channel();
         self.change_notifier = Some(tx.clone());
 
@@ -144,11 +146,13 @@ impl ConfigLoader {
         let toml_value: toml::Value = toml::from_str(&content)?;
 
         // Validate against schema
-        self.schema_validator.validate_config(&toml_value)
+        self.schema_validator
+            .validate_config(&toml_value)
             .map_err(ConfigError::ValidationError)?;
 
         // Validate dependencies
-        self.schema_validator.validate_dependencies(&toml_value)
+        self.schema_validator
+            .validate_dependencies(&toml_value)
             .map_err(ConfigError::ValidationError)?;
 
         Ok(())
@@ -157,8 +161,8 @@ impl ConfigLoader {
     /// Export current configuration to file
     pub fn export_config<P: AsRef<Path>>(&self, path: P) -> Result<(), ConfigError> {
         let config = self.get_current_config();
-        let toml_content = toml::to_string_pretty(&config)
-            .map_err(|e| ConfigError::ParseError(e.to_string()))?;
+        let toml_content =
+            toml::to_string_pretty(&config).map_err(|e| ConfigError::ParseError(e.to_string()))?;
 
         std::fs::write(path, toml_content)?;
         Ok(())
@@ -166,7 +170,8 @@ impl ConfigLoader {
 
     /// Get configuration file modification times
     pub fn get_config_timestamps(&self) -> Vec<(PathBuf, Option<SystemTime>)> {
-        self.config_paths.iter()
+        self.config_paths
+            .iter()
             .map(|path| {
                 let timestamp = std::fs::metadata(path)
                     .and_then(|meta| meta.modified())
@@ -201,15 +206,18 @@ impl ConfigLoader {
         self.apply_environment_overrides(&mut merged_config);
 
         // Validate merged configuration
-        self.schema_validator.validate_config(&merged_config)
+        self.schema_validator
+            .validate_config(&merged_config)
             .map_err(ConfigError::ValidationError)?;
 
-        self.schema_validator.validate_dependencies(&merged_config)
+        self.schema_validator
+            .validate_dependencies(&merged_config)
             .map_err(ConfigError::ValidationError)?;
 
         // Convert to SystemConfig
-        let config: SystemConfig = merged_config.try_into()
-            .map_err(|e| ConfigError::ParseError(format!("Failed to deserialize config: {:?}", e)))?;
+        let config: SystemConfig = merged_config.try_into().map_err(|e| {
+            ConfigError::ParseError(format!("Failed to deserialize config: {:?}", e))
+        })?;
 
         Ok(config)
     }
@@ -249,7 +257,8 @@ impl ConfigLoader {
 
         for (key, value) in env::vars() {
             if key.starts_with("EMG_") {
-                let config_key = key.strip_prefix("EMG_")
+                let config_key = key
+                    .strip_prefix("EMG_")
                     .unwrap()
                     .to_lowercase()
                     .replace('_', ".");
@@ -287,7 +296,8 @@ impl ConfigLoader {
             } else {
                 // Intermediate part - ensure it's a table
                 if let toml::Value::Table(table) = current {
-                    let entry = table.entry(part.to_string())
+                    let entry = table
+                        .entry(part.to_string())
                         .or_insert_with(|| toml::Value::Table(toml::value::Table::new()));
                     current = entry;
                 }
@@ -296,7 +306,7 @@ impl ConfigLoader {
     }
 
     fn setup_file_watcher(&mut self, tx: mpsc::Sender<SystemConfig>) -> Result<(), ConfigError> {
-        use notify::{Watcher, RecursiveMode, DebouncedEvent};
+        use notify::{DebouncedEvent, RecursiveMode, Watcher};
 
         let (watch_tx, watch_rx) = mpsc::channel();
         let mut watcher = notify::watcher(watch_tx, Duration::from_millis(500))
@@ -410,14 +420,18 @@ mod tests {
         let loader = ConfigLoader::new();
 
         let mut temp_file = NamedTempFile::new().unwrap();
-        writeln!(temp_file, r#"
+        writeln!(
+            temp_file,
+            r#"
 [system]
 sampling_rate_hz = 2000
 channel_count = 8
 
 [hal]
 device_type = "simulator"
-        "#).unwrap();
+        "#
+        )
+        .unwrap();
 
         assert!(loader.validate_config_file(temp_file.path()).is_ok());
     }
@@ -427,24 +441,32 @@ device_type = "simulator"
         let loader = ConfigLoader::new();
 
         let mut temp_file = NamedTempFile::new().unwrap();
-        writeln!(temp_file, r#"
+        writeln!(
+            temp_file,
+            r#"
 [system]
 sampling_rate_hz = 50  # Too low
-        "#).unwrap();
+        "#
+        )
+        .unwrap();
 
         assert!(loader.validate_config_file(temp_file.path()).is_err());
     }
 
     #[test]
     fn test_environment_override() {
-        unsafe { std::env::set_var("EMG_SYSTEM_SAMPLING_RATE_HZ", "4000"); }
+        unsafe {
+            std::env::set_var("EMG_SYSTEM_SAMPLING_RATE_HZ", "4000");
+        }
 
         let mut loader = ConfigLoader::new();
         let config = loader.load_system_config().unwrap();
 
         assert_eq!(config.system.sampling_rate_hz, 4000);
 
-        unsafe { std::env::remove_var("EMG_SYSTEM_SAMPLING_RATE_HZ"); }
+        unsafe {
+            std::env::remove_var("EMG_SYSTEM_SAMPLING_RATE_HZ");
+        }
     }
 
     #[test]

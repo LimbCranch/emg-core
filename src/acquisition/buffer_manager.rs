@@ -7,7 +7,8 @@ use crate::acquisition::sample_sync::SampleSynchronizer;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, AtomicU32, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::sync::Mutex;
+use std::time::Instant;
 
 /// Buffer configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -58,9 +59,9 @@ pub struct BufferMetrics {
 
 /// Main buffer manager coordinating all acquisition buffers
 pub struct BufferManager {
-    raw_buffer: Arc<MpmcRingBuffer<EmgSample>>,
-    processed_buffer: Arc<LockFreeRingBuffer<ProcessedSample>>,
-    synchronizer: Arc<SampleSynchronizer>,
+    raw_buffer: Arc<Mutex<MpmcRingBuffer<EmgSample>>>,
+    processed_buffer: Arc<Mutex<LockFreeRingBuffer<ProcessedSample>>>,
+    synchronizer: Arc<Mutex<SampleSynchronizer>>,
     config: BufferConfig,
     metrics: BufferMetrics,
 
@@ -106,15 +107,15 @@ impl BufferManager {
         let processed_buffer_size = config.processed_buffer_size
             .unwrap_or_else(|| Self::calculate_processed_buffer_size(&config));
 
-        let raw_buffer = Arc::new(
+        let raw_buffer = Arc::new(Mutex::new(
             MpmcRingBuffer::new(raw_buffer_size)
                 .map_err(|e| BufferManagerError::ConfigurationError(format!("Raw buffer: {:?}", e)))?
-        );
+        ));
 
-        let processed_buffer = Arc::new(
+        let processed_buffer = Arc::new(Mutex::new(
             LockFreeRingBuffer::new(processed_buffer_size)
                 .map_err(|e| BufferManagerError::ConfigurationError(format!("Processed buffer: {:?}", e)))?
-        );
+        ));
 
         let sync_config = crate::acquisition::sample_sync::SyncConfig {
             channel_count: config.channel_count,
@@ -123,10 +124,10 @@ impl BufferManager {
             sync_timeout_ms: config.target_latency_ms / 2,
         };
 
-        let synchronizer = Arc::new(
+        let synchronizer = Arc::new(Mutex::new(
             SampleSynchronizer::new(sync_config)
                 .map_err(|e| BufferManagerError::ConfigurationError(e))?
-        );
+        ));
 
         Ok(Self {
             raw_buffer,
@@ -156,12 +157,13 @@ impl BufferManager {
 
     /// Add raw EMG sample to buffer
     pub fn add_raw_sample(&self, sample: EmgSample) -> Result<(), BufferManagerError> {
-        if self.config.enable_overflow_protection && self.raw_buffer.utilization() > 0.9 {
+        let mut raw_buffer = self.raw_buffer.lock().unwrap();
+        if self.config.enable_overflow_protection && raw_buffer.utilization() > 0.9 {
             self.overruns.fetch_add(1, Ordering::Relaxed);
             return Err(BufferManagerError::BufferFull);
         }
 
-        match self.raw_buffer.try_push(sample) {
+        match raw_buffer.try_push(sample) {
             Ok(()) => {
                 self.samples_processed.fetch_add(1, Ordering::Relaxed);
                 Ok(())
@@ -175,7 +177,8 @@ impl BufferManager {
 
     /// Get next raw sample for processing
     pub fn get_raw_sample(&self) -> Option<EmgSample> {
-        match self.raw_buffer.try_pop() {
+        let raw_buffer = self.raw_buffer.lock().unwrap();
+        match raw_buffer.try_pop() {
             Some(sample) => Some(sample),
             None => {
                 self.underruns.fetch_add(1, Ordering::Relaxed);
@@ -189,7 +192,8 @@ impl BufferManager {
         // Update latency metrics
         self.update_latency_metrics(sample.processing_latency_ns);
 
-        match self.processed_buffer.try_push(sample) {
+        let mut processed_buffer = self.processed_buffer.lock().unwrap();
+        match processed_buffer.try_push(sample) {
             Ok(()) => Ok(()),
             Err(_) => {
                 self.samples_dropped.fetch_add(1, Ordering::Relaxed);
@@ -200,17 +204,18 @@ impl BufferManager {
 
     /// Get processed sample for output
     pub fn get_processed_sample(&self) -> Option<ProcessedSample> {
-        self.processed_buffer.try_pop()
+        let processed_buffer = self.processed_buffer.lock().unwrap();
+        processed_buffer.try_pop()
     }
 
     /// Add multi-channel sample via synchronizer
     pub fn add_synchronized_sample(&self, values: &[f32]) -> Result<(), BufferManagerError> {
-        self.synchronizer
-            .add_multi_channel_sample(values)
+        let mut synchronizer = self.synchronizer.lock().unwrap();
+        synchronizer.add_multi_channel_sample(values)
             .map_err(BufferManagerError::SynchronizationError)?;
 
         // Try to get synchronized sample and add to raw buffer
-        if let Some(sample) = self.synchronizer.try_get_synchronized_sample() {
+        if let Some(sample) = synchronizer.try_get_synchronized_sample() {
             self.add_raw_sample(sample)?;
         }
 
@@ -232,8 +237,8 @@ impl BufferManager {
         };
 
         BufferMetrics {
-            raw_utilization: self.raw_buffer.utilization(),
-            processed_utilization: self.processed_buffer.utilization(),
+            raw_utilization: self.raw_buffer.lock().unwrap().utilization(),
+            processed_utilization: self.processed_buffer.lock().unwrap().utilization(),
             samples_processed,
             samples_dropped,
             average_latency_ns,
@@ -261,7 +266,7 @@ impl BufferManager {
         let error_ok = error_rate < 0.01; // Less than 1% error rate
 
         // Check synchronizer health
-        let sync_ok = self.synchronizer.is_healthy();
+        let sync_ok = self.synchronizer.lock().unwrap().is_healthy();
 
         raw_ok && processed_ok && error_ok && sync_ok
     }
@@ -269,9 +274,12 @@ impl BufferManager {
     /// Reset all buffers and metrics
     pub fn reset(&self) {
         // Clear buffers
-        while self.raw_buffer.try_pop().is_some() {}
-        while self.processed_buffer.try_pop().is_some() {}
-        self.synchronizer.reset();
+        let raw_buffer = self.raw_buffer.lock().unwrap();
+        while raw_buffer.try_pop().is_some() {}
+        let processed_buffer = self.processed_buffer.lock().unwrap();
+        while processed_buffer.try_pop().is_some() {}
+        let synchronizer = self.synchronizer.lock().unwrap();
+        synchronizer.reset();
 
         // Reset metrics
         self.samples_processed.store(0, Ordering::Relaxed);
@@ -284,17 +292,17 @@ impl BufferManager {
     }
 
     /// Get raw buffer handle for direct access
-    pub fn raw_buffer(&self) -> Arc<MpmcRingBuffer<EmgSample>> {
+    pub fn raw_buffer(&self) -> Arc<Mutex<MpmcRingBuffer<EmgSample>>> {
         self.raw_buffer.clone()
     }
 
     /// Get processed buffer handle for direct access
-    pub fn processed_buffer(&self) -> Arc<LockFreeRingBuffer<ProcessedSample>> {
+    pub fn processed_buffer(&self) -> Arc<Mutex<LockFreeRingBuffer<ProcessedSample>>> {
         self.processed_buffer.clone()
     }
 
     /// Get synchronizer handle
-    pub fn synchronizer(&self) -> Arc<SampleSynchronizer> {
+    pub fn synchronizer(&self) -> Arc<Mutex<SampleSynchronizer>> {
         self.synchronizer.clone()
     }
 

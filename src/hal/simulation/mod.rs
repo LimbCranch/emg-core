@@ -9,9 +9,10 @@ pub mod profiles;
 
 pub mod config;
 
-
+/*
 pub use signal_generator::EmgSignalGenerator;
 pub use noise_models::NoiseModel;
 pub use artifact_injection::ArtifactInjector;
 pub use muscle_model::MuscleModel;
 pub use profiles::SimulationProfile;
+*/

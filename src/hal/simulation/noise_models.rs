@@ -141,7 +141,6 @@ impl PowerlineNoiseGenerator {
         let mut interference = 0.0;
 
         for harmonic in &self.harmonics {
-            let harmonic_freq = self.frequency_hz * harmonic.frequency_multiplier;
             let harmonic_phase = *phase * harmonic.frequency_multiplier + harmonic.phase_offset;
             interference += harmonic_phase.sin() * harmonic.amplitude_factor;
         }

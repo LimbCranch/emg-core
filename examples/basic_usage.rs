@@ -12,12 +12,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Load configuration
     println!("Loading configuration...");
-    let config_loader = ConfigLoader::new();
+    let mut config_loader = ConfigLoader::new();
     let config = config_loader.load_system_config()?;
     println!("Configuration loaded successfully");
     println!("  - Sampling rate: {} Hz", config.system.sampling_rate_hz);
     println!("  - Channel count: {}", config.system.channel_count);
     println!("  - Device type: {:?}", config.hal.device_type);
+    println!("  - Profile type: {}", config.hal.simulator.unwrap().profile);
+
 
     // Create and initialize simulator device
     println!("\nCreating simulator device...");

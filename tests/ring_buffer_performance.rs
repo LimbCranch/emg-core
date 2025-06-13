@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 #[test]
 fn test_spsc_latency_under_100ns() {
-    let buffer = LockFreeRingBuffer::new(1024).unwrap();
+    let mut buffer = LockFreeRingBuffer::new(1024).unwrap();
     let iterations = 10000;
     let mut push_times = Vec::with_capacity(iterations);
     let mut pop_times = Vec::with_capacity(iterations);
@@ -57,7 +57,7 @@ fn test_spsc_latency_under_100ns() {
 
 #[test]
 fn test_mpmc_latency() {
-    let buffer = MpmcRingBuffer::new(1024).unwrap();
+    let mut buffer = MpmcRingBuffer::new(1024).unwrap();
     let iterations = 1000;
     let mut times = Vec::with_capacity(iterations);
 
@@ -84,7 +84,7 @@ fn test_mpmc_latency() {
 #[test]
 fn test_concurrent_spsc_performance() {
     let buffer = Arc::new(LockFreeRingBuffer::new(8192).unwrap());
-    let buffer_clone = buffer.clone();
+    let mut buffer_clone = buffer.clone();
     let iterations = 100000;
 
     let start_time = Instant::now();
@@ -133,7 +133,7 @@ fn test_memory_ordering_stress() {
 
     // Start multiple producer threads
     for thread_id in 0..num_threads {
-        let buffer_clone = buffer.clone();
+        let mut buffer_clone = buffer.clone();
         let handle = thread::spawn(move || {
             for i in 0..iterations {
                 let value = thread_id * iterations + i;

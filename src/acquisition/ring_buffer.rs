@@ -30,6 +30,18 @@ pub enum RingBufferError {
     InvalidCapacity,
 }
 
+impl std::fmt::Display for RingBufferError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RingBufferError::Full => write!(f, "Ring buffer is full"),
+            RingBufferError::Empty => write!(f, "Ring buffer is empty"),
+            RingBufferError::InvalidCapacity => write!(f, "Invalid buffer capacity (must be power of 2)"),
+        }
+    }
+}
+
+impl std::error::Error for RingBufferError {}
+
 impl<T> LockFreeRingBuffer<T> {
     /// Create new ring buffer with power-of-2 capacity
     pub fn new(capacity: usize) -> Result<Self, RingBufferError> {
@@ -228,8 +240,6 @@ impl<T> Drop for MpmcRingBuffer<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::thread;
-    use std::sync::Arc;
 
     #[test]
     fn test_spsc_basic_operations() {

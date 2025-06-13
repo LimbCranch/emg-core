@@ -1,7 +1,7 @@
 ﻿// src/processing/pipeline.rs
 //! Complete signal processing pipeline
 
-use crate::hal::{EmgSample, QualityMetrics};
+use crate::hal::{EmgSample};
 use crate::config::processing_config::ProcessingConfig;
 use crate::processing::{FilterBank, QualityMonitor, WindowManager, WindowAnalysis};
 use crate::acquisition::ProcessedSample;
@@ -195,6 +195,7 @@ pub struct PipelineStatistics {
 mod tests {
     use super::*;
     use crate::config::processing_config::ProcessingConfig;
+    use crate::QualityMetrics;
 
     #[test]
     fn test_pipeline_creation() {

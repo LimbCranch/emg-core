@@ -1,7 +1,6 @@
 ﻿// src/config/schema_validator.rs
 //! Configuration schema validation
 
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use crate::config::constants::*;
 
@@ -255,15 +254,22 @@ impl SchemaValidator {
             }
             FieldConstraint::OneOf(options) => {
                 if let Some(val) = value.as_str() {
-                    if !options.contains(&val.to_string()) {
+                    let val_lower = val.to_lowercase();
+                    let options_lower: Vec<String> = options.iter().map(|opt| opt.to_lowercase()).collect();
+
+                    if !options_lower.contains(&val_lower) {
                         return Err(ValidationError {
                             field: field.to_string(),
-                            message: format!("Value must be one of: {}", options.join(", ")),
+                            message: format!(
+                                "Value must be one of: {}",
+                                options.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
+                            ),
                             value: val.to_string(),
                         });
                     }
                 }
             }
+
             FieldConstraint::MinLength(min_len) => {
                 if let Some(val) = value.as_str() {
                     if val.len() < *min_len {

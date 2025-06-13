@@ -1,7 +1,7 @@
 ﻿// src/processing/filter_bank.rs
 //! Filter bank combining multiple filters
 
-use crate::config::processing_config::{FilterBankConfig, NotchFilterConfig};
+use crate::config::processing_config::{FilterBankConfig};
 use crate::processing::filters::{IirFilter, NotchFilter, FilterError, BandType};
 
 /// Filter bank with multiple stages
