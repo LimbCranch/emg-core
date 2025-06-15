@@ -43,6 +43,8 @@
 pub mod config;
 pub mod hal;
 pub mod utils;
+mod processing;
+mod error;
 
 // Re-export commonly used types for convenience
 pub use hal::{

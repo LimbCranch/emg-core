@@ -1,4 +1,3 @@
-
 use crate::error::EmgError;
 
 /// Wavelet coefficients and energy distribution

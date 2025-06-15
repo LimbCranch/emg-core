@@ -11,7 +11,6 @@ pub mod frequency;
 pub mod wavelets;
 
 use crate::error::EmgError;
-use crate::processing::pipeline::FeatureVector;
 use std::collections::VecDeque;
 
 pub use time_domain::TimeDomainExtractor;
@@ -45,6 +44,57 @@ impl Default for FeatureConfig {
                 (150.0, 300.0),  // High frequency
                 (300.0, 500.0),  // Very high frequency
             ],
+        }
+    }
+}
+
+/// Extended feature vector with all EMG features
+#[derive(Debug, Clone)]
+pub struct FeatureVector {
+    // Time domain features
+    pub rms: Vec<f32>,
+    pub mean_absolute_value: Vec<f32>,
+    pub zero_crossings: Vec<u32>,
+    pub slope_sign_changes: Vec<u32>,
+    pub waveform_length: Vec<f32>,
+    pub variance: Vec<f32>,
+    pub skewness: Vec<f32>,
+    pub kurtosis: Vec<f32>,
+
+    // Frequency domain features
+    pub spectral_centroid: Vec<f32>,
+    pub mean_frequency: Vec<f32>,
+    pub median_frequency: Vec<f32>,
+    pub power_spectral_density: Vec<Vec<f32>>,
+    pub frequency_band_powers: Vec<Vec<f32>>,
+    pub spectral_rolloff: Vec<f32>,
+    pub spectral_flux: Vec<f32>,
+
+    // Wavelet features (optional)
+    pub wavelet_coefficients: Option<Vec<Vec<f32>>>,
+    pub wavelet_energy: Option<Vec<Vec<f32>>>,
+}
+
+impl FeatureVector {
+    pub fn default_for_channels(channel_count: usize) -> Self {
+        Self {
+            rms: vec![0.0; channel_count],
+            mean_absolute_value: vec![0.0; channel_count],
+            zero_crossings: vec![0; channel_count],
+            slope_sign_changes: vec![0; channel_count],
+            waveform_length: vec![0.0; channel_count],
+            variance: vec![0.0; channel_count],
+            skewness: vec![0.0; channel_count],
+            kurtosis: vec![0.0; channel_count],
+            spectral_centroid: vec![0.0; channel_count],
+            mean_frequency: vec![0.0; channel_count],
+            median_frequency: vec![0.0; channel_count],
+            power_spectral_density: vec![vec![0.0; 1]; channel_count],
+            frequency_band_powers: vec![vec![0.0; 1]; channel_count],
+            spectral_rolloff: vec![0.0; channel_count],
+            spectral_flux: vec![0.0; channel_count],
+            wavelet_coefficients: None,
+            wavelet_energy: None,
         }
     }
 }

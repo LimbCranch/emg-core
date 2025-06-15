@@ -1,4 +1,3 @@
-
 //! Frequency domain feature extraction for EMG signals
 
 use crate::error::EmgError;

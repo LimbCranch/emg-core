@@ -670,6 +670,7 @@ dependencies = [
  "proptest",
  "prost",
  "rand 0.8.5",
+ "rayon",
  "redis",
  "rustfft",
  "serde",

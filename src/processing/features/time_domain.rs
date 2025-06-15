@@ -1,6 +1,6 @@
 //! Time domain feature extraction for EMG signals
 
-use crate::error::{EmgError, ErrorContext};
+use crate::error::EmgError;
 use crate::config::processing::TIME_DOMAIN_FEATURE_COUNT;
 
 /// Time domain features extracted from EMG signals
@@ -51,16 +51,7 @@ impl TimeDomainExtractor {
                 actual_timing: None,
                 drift_ns: None,
                 reason: "Empty window provided".to_string(),
-                context: ErrorContext {
-                    timestamp: (std::time::SystemTime::now()),
-                    thread_id: None,
-                    component: "".to_string(),
-                    operation: "".to_string(),
-                    file: None,
-                    line: None,
-                    additional_info: Default::default(),
-                    chain: vec![],
-                },
+                context: Default::default(),
             });
 
             //return Err(EmgError:: Processing("Empty window provided".to_string()));

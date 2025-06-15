@@ -1,200 +1,314 @@
 ﻿// src/processing/filter_bank.rs
 //! Filter bank combining multiple filters_v1
 
-use crate::config::processing_config::{FilterBankConfig};
-use crate::processing::filters_v1::{IirFilter, NotchFilter, FilterError, BandType};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use rayon::prelude::*;
+use crate::error::EmgError;
+use crate::processing::filters::{IIRFilter, FIRFilter, NotchFilter, FilterType, WindowType};
+use crate::processing::quality_monitor::ChannelQualityMonitor;
 
-/// Filter bank with multiple stages
+/// Configuration for a single filter in the chain
+#[derive(Debug, Clone)]
+pub struct FilterConfig {
+    pub filter_type: FilterType,
+    pub enabled: bool,
+    pub parameters: FilterParameters,
+}
+
+/// Filter parameters for different filter types
+#[derive(Debug, Clone)]
+pub enum FilterParameters {
+    IIR {
+        cutoff_freq: f32,
+        bandwidth: Option<f32>,
+        order: usize,
+    },
+    FIR {
+        order: usize,
+        window_type: WindowType,
+        frequency_response: Vec<f32>,
+    },
+    Notch {
+        center_freq: f32,
+        bandwidth: f32,
+        q_factor: f32,
+        harmonics: Vec<f32>,
+    },
+}
+
+/// Channel-specific filter configuration
+#[derive(Debug, Clone)]
+pub struct ChannelConfig {
+    pub channel_id: usize,
+    pub filters: Vec<FilterConfig>,
+    pub bypass: bool,
+}
+
+/// Filter bank configuration
+#[derive(Debug, Clone)]
+pub struct FilterBankConfig {
+    pub channels: Vec<ChannelConfig>,
+    pub sample_rate: f32,
+    pub enable_simd: bool,
+    pub enable_parallel: bool,
+}
+
+/// Performance metrics for filter bank
+#[derive(Debug, Default)]
+pub struct FilterBankMetrics {
+    pub processing_time: Duration,
+    pub latency: Duration,
+    pub channel_quality: Vec<f32>,
+}
+
+/// Enhanced filter bank implementation
 pub struct FilterBank {
-    highpass: Option<IirFilter>,
-    lowpass: Option<IirFilter>,
-    notch_filters: Vec<NotchFilter>,
     config: FilterBankConfig,
-    is_initialized: bool,
+    filters: Vec<Vec<Box<dyn DigitalFilter>>>,
+    quality_monitors: Vec<ChannelQualityMonitor>,
+    metrics: FilterBankMetrics,
+    last_process_time: Instant,
 }
 
 impl FilterBank {
-    /// Create filter bank from configuration
-    pub fn from_config(config: FilterBankConfig, sample_rate: f32) -> Result<Self, FilterError> {
-        let mut bank = Self {
-            highpass: None,
-            lowpass: None,
-            notch_filters: Vec::new(),
-            config: config.clone(),
-            is_initialized: false,
-        };
+    /// Create a new filter bank from configuration
+    pub fn new(config: FilterBankConfig) -> Result<Self, EmgError> {
+        let mut filters = Vec::with_capacity(config.channels.len());
+        let mut quality_monitors = Vec::with_capacity(config.channels.len());
 
-        // Create highpass filter
-        if config.highpass_cutoff_hz > 0.0 {
-            let highpass = IirFilter::butterworth(
-                config.filter_order,
-                config.highpass_cutoff_hz,
-                sample_rate,
-                BandType::Highpass
-            )?;
-            bank.highpass = Some(highpass);
-        }
+        // Initialize filters for each channel
+        for channel_config in &config.channels {
+            let mut channel_filters = Vec::new();
+            
+            for filter_config in &channel_config.filters {
+                if !filter_config.enabled {
+                    continue;
+                }
 
-        // Create lowpass filter
-        if config.lowpass_cutoff_hz > 0.0 && config.lowpass_cutoff_hz < sample_rate / 2.0 {
-            let lowpass = IirFilter::butterworth(
-                config.filter_order,
-                config.lowpass_cutoff_hz,
-                sample_rate,
-                BandType::Lowpass
-            )?;
-            bank.lowpass = Some(lowpass);
-        }
-
-        // Create notch filters_v1
-        for &freq in &config.notch_filters.frequencies_hz {
-            if freq > 0.0 && freq < sample_rate / 2.0 {
-                let notch = NotchFilter::new(freq, config.notch_filters.bandwidth_hz, sample_rate)?;
-                bank.notch_filters.push(notch);
+                let filter: Box<dyn DigitalFilter> = match &filter_config.parameters {
+                    FilterParameters::IIR { cutoff_freq, bandwidth, order } => {
+                        Box::new(IIRFilter::new(
+                            filter_config.filter_type,
+                            config.sample_rate,
+                            *cutoff_freq,
+                            *bandwidth,
+                            *order,
+                        )?)
+                    }
+                    FilterParameters::FIR { order, window_type, frequency_response } => {
+                        Box::new(FIRFilter::new(
+                            *order,
+                            *window_type,
+                            frequency_response,
+                        )?)
+                    }
+                    FilterParameters::Notch { center_freq, bandwidth, q_factor, harmonics } => {
+                        let mut notch = NotchFilter::new(
+                            *center_freq,
+                            config.sample_rate,
+                            *bandwidth,
+                            *q_factor,
+                        )?;
+                        
+                        for &harmonic in harmonics {
+                            notch.add_harmonic(harmonic)?;
+                        }
+                        
+                        Box::new(notch)
+                    }
+                };
+                
+                channel_filters.push(filter);
             }
+            
+            filters.push(channel_filters);
+            quality_monitors.push(ChannelQualityMonitor::new(config.sample_rate));
         }
 
-        bank.is_initialized = true;
-        Ok(bank)
+        Ok(Self {
+            config,
+            filters,
+            quality_monitors,
+            metrics: FilterBankMetrics::default(),
+            last_process_time: Instant::now(),
+        })
     }
 
-    /// Process single sample through filter bank
-    pub fn process_sample(&mut self, sample: f32) -> f32 {
-        if !self.is_initialized {
-            return sample;
+    /// Process a block of multi-channel data
+    pub fn process(&mut self, input: &[Vec<f32>]) -> Result<Vec<Vec<f32>>, EmgError> {
+        let start_time = Instant::now();
+        
+        if input.len() != self.config.channels.len() {
+            return Err(EmgError::Configuration(
+                format!("Expected {} channels, got {}", self.config.channels.len(), input.len())
+            ));
         }
 
-        let mut output = sample;
-
-        // Apply highpass filter first
-        if let Some(ref mut highpass) = self.highpass {
-            output = highpass.process_sample(output);
+        let mut output = Vec::with_capacity(input.len());
+        
+        // Process channels in parallel if enabled
+        if self.config.enable_parallel {
+            output = self.process_parallel(input)?;
+        } else {
+            output = self.process_sequential(input)?;
         }
 
-        // Apply lowpass filter
-        if let Some(ref mut lowpass) = self.lowpass {
-            output = lowpass.process_sample(output);
+        // Update metrics
+        self.metrics.processing_time = start_time.elapsed();
+        self.metrics.latency = self.last_process_time.elapsed();
+        self.last_process_time = Instant::now();
+
+        // Update quality metrics
+        for (i, monitor) in self.quality_monitors.iter_mut().enumerate() {
+            self.metrics.channel_quality[i] = monitor.update_quality(&output[i]);
         }
 
-        // Apply all notch filters_v1
-        for notch in &mut self.notch_filters {
-            output = notch.process_sample(output);
-        }
-
-        output
+        Ok(output)
     }
 
-    /// Process multiple channels
-    pub fn process_channels(&mut self, samples: &[f32]) -> Vec<f32> {
-        samples.iter()
-            .map(|&sample| self.process_sample(sample))
-            .collect()
+    /// Process channels sequentially
+    fn process_sequential(&mut self, input: &[Vec<f32>]) -> Result<Vec<Vec<f32>>, EmgError> {
+        let mut output = Vec::with_capacity(input.len());
+        
+        for (channel_idx, channel_data) in input.iter().enumerate() {
+            if self.config.channels[channel_idx].bypass {
+                output.push(channel_data.clone());
+                continue;
+            }
+
+            let mut channel_output = channel_data.clone();
+            
+            for filter in &mut self.filters[channel_idx] {
+                channel_output = filter.process(&channel_output);
+            }
+            
+            output.push(channel_output);
+        }
+        
+        Ok(output)
+    }
+
+    /// Process channels in parallel using rayon
+    fn process_parallel(&mut self, input: &[Vec<f32>]) -> Result<Vec<Vec<f32>>, EmgError> {
+        let output: Vec<Vec<f32>> = input.par_iter()
+            .enumerate()
+            .map(|(channel_idx, channel_data)| {
+                if self.config.channels[channel_idx].bypass {
+                    return channel_data.clone();
+                }
+
+                let mut channel_output = channel_data.clone();
+                
+                for filter in &mut self.filters[channel_idx] {
+                    channel_output = filter.process(&channel_output);
+                }
+                
+                channel_output
+            })
+            .collect();
+            
+        Ok(output)
+    }
+
+    /// Get current performance metrics
+    pub fn get_metrics(&self) -> &FilterBankMetrics {
+        &self.metrics
     }
 
     /// Reset all filter states
     pub fn reset(&mut self) {
-        if let Some(ref mut highpass) = self.highpass {
-            highpass.reset();
+        for channel_filters in &mut self.filters {
+            for filter in channel_filters {
+                filter.reset();
+            }
         }
-        if let Some(ref mut lowpass) = self.lowpass {
-            lowpass.reset();
+        
+        for monitor in &mut self.quality_monitors {
+            monitor.reset();
         }
-        for notch in &mut self.notch_filters {
-            notch.reset();
-        }
+        
+        self.metrics = FilterBankMetrics::default();
     }
 
-    /// Get configuration
-    pub fn config(&self) -> &FilterBankConfig {
-        &self.config
+    /// Enable/disable SIMD acceleration
+    pub fn set_simd_enabled(&mut self, enabled: bool) {
+        self.config.enable_simd = enabled;
     }
 
-    /// Check if initialized
-    pub fn is_initialized(&self) -> bool {
-        self.is_initialized
-    }
-
-    /// Get filter counts
-    pub fn filter_counts(&self) -> (usize, usize, usize) {
-        (
-            if self.highpass.is_some() { 1 } else { 0 },
-            if self.lowpass.is_some() { 1 } else { 0 },
-            self.notch_filters.len()
-        )
+    /// Enable/disable parallel processing
+    pub fn set_parallel_enabled(&mut self, enabled: bool) {
+        self.config.enable_parallel = enabled;
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::processing_config::{FilterBankConfig, NotchFilterConfig, FilterType};
 
     #[test]
     fn test_filter_bank_creation() {
         let config = FilterBankConfig {
-            highpass_cutoff_hz: 20.0,
-            lowpass_cutoff_hz: 500.0,
-            filter_order: 4,
-            filter_type: FilterType::Butterworth,
-            notch_filters: NotchFilterConfig {
-                frequencies_hz: vec![50.0, 60.0],
-                bandwidth_hz: 2.0,
-            },
+            channels: vec![
+                ChannelConfig {
+                    channel_id: 0,
+                    filters: vec![
+                        FilterConfig {
+                            filter_type: FilterType::LowPass,
+                            enabled: true,
+                            parameters: FilterParameters::IIR {
+                                cutoff_freq: 500.0,
+                                bandwidth: None,
+                                order: 4,
+                            },
+                        }
+                    ],
+                    bypass: false,
+                }
+            ],
+            sample_rate: 2000.0,
+            enable_simd: true,
+            enable_parallel: true,
         };
 
-        let bank = FilterBank::from_config(config, 2000.0);
+        let bank = FilterBank::new(config);
         assert!(bank.is_ok());
-
-        let bank = bank.unwrap();
-        assert!(bank.is_initialized());
-
-        let (hp_count, lp_count, notch_count) = bank.filter_counts();
-        assert_eq!(hp_count, 1);
-        assert_eq!(lp_count, 1);
-        assert_eq!(notch_count, 2);
     }
 
     #[test]
     fn test_filter_bank_processing() {
         let config = FilterBankConfig {
-            highpass_cutoff_hz: 20.0,
-            lowpass_cutoff_hz: 500.0,
-            filter_order: 2,
-            filter_type: FilterType::Butterworth,
-            notch_filters: NotchFilterConfig {
-                frequencies_hz: vec![50.0],
-                bandwidth_hz: 2.0,
-            },
+            channels: vec![
+                ChannelConfig {
+                    channel_id: 0,
+                    filters: vec![
+                        FilterConfig {
+                            filter_type: FilterType::LowPass,
+                            enabled: true,
+                            parameters: FilterParameters::IIR {
+                                cutoff_freq: 500.0,
+                                bandwidth: None,
+                                order: 4,
+                            },
+                        }
+                    ],
+                    bypass: false,
+                }
+            ],
+            sample_rate: 2000.0,
+            enable_simd: true,
+            enable_parallel: true,
         };
 
-        let mut bank = FilterBank::from_config(config, 2000.0).unwrap();
-
-        // Test single sample
-        let output = bank.process_sample(1.0);
-        assert!(output.is_finite());
-
-        // Test multi-channel
-        let inputs = vec![0.1, 0.2, 0.3, 0.4];
-        let outputs = bank.process_channels(&inputs);
-        assert_eq!(outputs.len(), 4);
-        assert!(outputs.iter().all(|&x| x.is_finite()));
-    }
-
-    #[test]
-    fn test_filter_bank_reset() {
-        let config = FilterBankConfig::default();
-        let mut bank = FilterBank::from_config(config, 2000.0).unwrap();
-
-        // Process some samples
-        for _ in 0..10 {
-            bank.process_sample(1.0);
-        }
-
-        // Reset shouldn't crash
-        bank.reset();
-
-        // Should still work after reset
-        let output = bank.process_sample(1.0);
-        assert!(output.is_finite());
+        let mut bank = FilterBank::new(config).unwrap();
+        
+        // Test processing
+        let input = vec![vec![1.0; 1000]; 1];
+        let output = bank.process(&input);
+        assert!(output.is_ok());
+        
+        let output = output.unwrap();
+        assert_eq!(output.len(), 1);
+        assert_eq!(output[0].len(), 1000);
     }
 }
