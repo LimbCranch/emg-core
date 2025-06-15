@@ -2,6 +2,8 @@
 //! System-wide configuration constants
 //! FIXED: Added all missing constants to eliminate magic numbers
 
+mod error;
+
 /// Signal processing constants
 pub mod signal {
     pub const DEFAULT_SAMPLING_RATE_HZ: u32 = 2000;
