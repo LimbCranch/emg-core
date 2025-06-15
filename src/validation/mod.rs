@@ -1,15 +1,20 @@
-﻿use std::error::Error;
+﻿// src/validation/mod.rs
+//! Validation utilities for input data and configurations
+
+use std::error::Error;
 use std::fmt;
 
+/// Generic validator trait
 pub trait Validator<T> {
-    type Error;
+    type Error: Error + Send + Sync + 'static;
+
     fn validate(&self, input: &T) -> Result<(), Self::Error>;
 }
 
 /// Validation error types
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ValidationError {
-    TooSmall(usize, usize), // actual, expected
+    TooSmall(usize, usize), // actual, expected_min
     TooLarge(usize, usize), // actual, max_allowed
     InvalidFormat(String),
     InvalidRange(String),
@@ -35,6 +40,7 @@ impl fmt::Display for ValidationError {
 impl Error for ValidationError {}
 
 /// Packet validator for serial/USB communications
+#[derive(Clone, Debug)]
 pub struct PacketValidator {
     min_size: usize,
     max_size: usize,
@@ -92,8 +98,8 @@ impl Validator<Vec<u8>> for PacketValidator {
 
             if expected_checksum != calculated_checksum {
                 return Err(ValidationError::CorruptedData(
-                    format!("Checksum mismatch: expected {}, got {}",
-                            expected_checksum, calculated_checksum)
+                    format!("Checksum mismatch: expected 0x{:02X}, got 0x{:02X}",
+                            calculated_checksum, expected_checksum)
                 ));
             }
         }
@@ -102,90 +108,59 @@ impl Validator<Vec<u8>> for PacketValidator {
     }
 }
 
-/// EMG sample validator
-pub struct SampleValidator {
-    expected_channels: usize,
-    voltage_range: (f32, f32),
+/// Range validator for numeric values
+pub struct RangeValidator<T> {
+    min: T,
+    max: T,
 }
 
-impl SampleValidator {
-    pub fn new(channels: usize, min_voltage: f32, max_voltage: f32) -> Self {
-        Self {
-            expected_channels: channels,
-            voltage_range: (min_voltage, max_voltage),
-        }
+impl<T> RangeValidator<T> {
+    pub fn new(min: T, max: T) -> Self {
+        Self { min, max }
     }
 }
 
-impl Validator<Vec<f32>> for SampleValidator {
+impl<T> Validator<T> for RangeValidator<T>
+where
+    T: PartialOrd + fmt::Display + Clone,
+{
     type Error = ValidationError;
 
-    fn validate(&self, channels: &Vec<f32>) -> Result<(), Self::Error> {
-        if channels.len() != self.expected_channels {
-            return Err(ValidationError::InvalidFormat(
-                format!("Expected {} channels, got {}", self.expected_channels, channels.len())
+    fn validate(&self, value: &T) -> Result<(), Self::Error> {
+        if value < &self.min || value > &self.max {
+            return Err(ValidationError::InvalidRange(
+                format!("Value {} outside range [{}, {}]", value, self.min, self.max)
             ));
         }
-
-        for (i, &value) in channels.iter().enumerate() {
-            if !value.is_finite() {
-                return Err(ValidationError::InvalidRange(
-                    format!("Channel {} has non-finite value: {}", i, value)
-                ));
-            }
-            if value < self.voltage_range.0 || value > self.voltage_range.1 {
-                return Err(ValidationError::InvalidRange(
-                    format!("Channel {} value {} outside range [{}, {}]",
-                            i, value, self.voltage_range.0, self.voltage_range.1)
-                ));
-            }
-        }
-
         Ok(())
     }
 }
 
-// ================================================================================
-// CRITICAL FIX #6: Device State Management
-// File: src/hal/device_state.rs (NEW FILE)
-// ================================================================================
-
-/// Better device state management instead of Option<T>
-#[derive(Debug, Clone)]
-pub enum DeviceState<T> {
-    Disconnected,
-    Connecting,
-    Connected(T),
-    Error(String),
+/// String length validator
+pub struct LengthValidator {
+    min_length: usize,
+    max_length: usize,
 }
 
-impl<T> DeviceState<T> {
-    pub fn is_connected(&self) -> bool {
-        matches!(self, DeviceState::Connected(_))
-    }
-
-    pub fn is_disconnected(&self) -> bool {
-        matches!(self, DeviceState::Disconnected)
-    }
-
-    pub fn get_handle(&self) -> Option<&T> {
-        match self {
-            DeviceState::Connected(handle) => Some(handle),
-            _ => None,
-        }
-    }
-
-    pub fn take_handle(self) -> Option<T> {
-        match self {
-            DeviceState::Connected(handle) => Some(handle),
-            _ => None,
-        }
+impl LengthValidator {
+    pub fn new(min_length: usize, max_length: usize) -> Self {
+        Self { min_length, max_length }
     }
 }
 
-// ================================================================================
-// USAGE EXAMPLES AND TESTS
-// ================================================================================
+impl Validator<String> for LengthValidator {
+    type Error = ValidationError;
+
+    fn validate(&self, input: &String) -> Result<(), Self::Error> {
+        if input.len() < self.min_length {
+            return Err(ValidationError::TooSmall(input.len(), self.min_length));
+        }
+        if input.len() > self.max_length {
+            return Err(ValidationError::TooLarge(input.len(), self.max_length));
+        }
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -193,41 +168,65 @@ mod tests {
 
     #[test]
     fn test_packet_validator() {
-        let validator = PacketValidator::new(5, 100, vec![0xAA, 0x55])
-            .with_checksum();
+        let header = vec![0xAA, 0x55];
+        let validator = PacketValidator::new(10, 100, header.clone());
 
-        // Valid packet
-        let valid_packet = vec![0xAA, 0x55, 0x01, 0x02, 0x03];
+        // Test valid packet
+        let mut valid_packet = header.clone();
+        valid_packet.extend_from_slice(&[0u8; 8]); // Add data to meet min size
         assert!(validator.validate(&valid_packet).is_ok());
 
-        // Too small
-        let small_packet = vec![0xAA, 0x55];
+        // Test too small
+        let small_packet = vec![0xAA];
         assert!(validator.validate(&small_packet).is_err());
 
-        // Wrong header
-        let wrong_header = vec![0xBB, 0x55, 0x01, 0x02, 0x03];
-        assert!(validator.validate(&wrong_header).is_err());
+        // Test too large
+        let large_packet = vec![0u8; 200];
+        assert!(validator.validate(&large_packet).is_err());
+
+        // Test invalid header
+        let mut invalid_header = vec![0xFF, 0x55];
+        invalid_header.extend_from_slice(&[0u8; 8]);
+        assert!(validator.validate(&invalid_header).is_err());
     }
 
-    /*#[test]
-    fn test_mock_time_provider() {
-        let provider = MockTimeProvider::new(1000);
-        assert_eq!(provider.now_nanos(), 1000);
+    #[test]
+    fn test_checksum_validator() {
+        let header = vec![0xAA, 0x55];
+        let validator = PacketValidator::new(5, 100, header.clone()).with_checksum();
 
-        provider.advance_by(500);
-        assert_eq!(provider.now_nanos(), 1500);
+        // Create packet with correct checksum
+        let mut packet = header;
+        packet.extend_from_slice(&[0x01, 0x02]);
+        let checksum = packet.iter().fold(0u8, |acc, &b| acc.wrapping_add(b));
+        packet.push(checksum);
 
-        provider.set_time(2000);
-        assert_eq!(provider.now_nanos(), 2000);
-    }*/
+        assert!(validator.validate(&packet).is_ok());
+
+        // Corrupt checksum
+        if let Some(last) = packet.last_mut() {
+            *last = last.wrapping_add(1);
+        }
+        assert!(validator.validate(&packet).is_err());
+    }
 
     #[test]
-    fn test_device_state() {
-        let state: DeviceState<String> = DeviceState::Disconnected;
-        assert!(!state.is_connected());
+    fn test_range_validator() {
+        let validator = RangeValidator::new(0, 100);
 
-        let state = DeviceState::Connected("device_handle".to_string());
-        assert!(state.is_connected());
-        assert_eq!(state.get_handle(), Some(&"device_handle".to_string()));
+        assert!(validator.validate(&50).is_ok());
+        assert!(validator.validate(&0).is_ok());
+        assert!(validator.validate(&100).is_ok());
+        assert!(validator.validate(&-1).is_err());
+        assert!(validator.validate(&101).is_err());
+    }
+
+    #[test]
+    fn test_length_validator() {
+        let validator = LengthValidator::new(5, 20);
+
+        assert!(validator.validate(&"hello".to_string()).is_ok());
+        assert!(validator.validate(&"hi".to_string()).is_err()); // Too short
+        assert!(validator.validate(&"this is way too long for the validator".to_string()).is_err()); // Too long
     }
 }
