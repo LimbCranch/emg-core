@@ -15,7 +15,7 @@ pub use device_config::*;
 pub use processing_config::*;
 
 use serde::{Deserialize, Serialize};
-use crate::hal::{DeviceType, ThreadPriority};
+use crate::hal::types::{DeviceType, ThreadPriority};
 
 /// Complete system configuration with enhanced validation
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -71,7 +71,7 @@ pub struct HalConfig {
 
     pub simulator: Option<crate::hal::simulator::SimulatorConfig>,
     pub usb: Option<crate::hal::usb_driver::UsbDeviceConfig>,
-    pub serial: Option<crate::hal::serial_driver::SerialConfig>,
+    //pub serial: core::option::Option<T>,
 }
 
 /// Communication layer configuration
@@ -95,8 +95,8 @@ pub struct CommunicationConfig {
 
 /// Default value providers using constants
 mod defaults {
-    use crate::hal::{DeviceType, ThreadPriority};
     use crate::config::constants::*;
+    use crate::hal::types::{DeviceType, ThreadPriority};
 
     pub fn sampling_rate_hz() -> u32 { signal::DEFAULT_SAMPLING_RATE_HZ }
     pub fn channel_count() -> usize { signal::DEFAULT_CHANNEL_COUNT }
@@ -110,7 +110,7 @@ mod defaults {
     pub fn connection_timeout_ms() -> u32 { hal::DEFAULT_CONNECTION_TIMEOUT_MS }
     pub fn retry_attempts() -> u32 { hal::DEFAULT_RETRY_ATTEMPTS }
     pub fn auto_reconnect() -> bool { true }
-    pub fn device_scan_timeout_ms() -> u32 { hal::DEVICE_SCAN_TIMEOUT_MS }
+    pub fn device_scan_timeout_ms() -> u32 { hal::DEVICE_DISCOVERY_TIMEOUT_MS }
 
     pub fn shared_memory_size_mb() -> usize { communication::DEFAULT_SHARED_MEMORY_SIZE_MB }
     pub fn message_queue_size() -> usize { communication::DEFAULT_MESSAGE_QUEUE_SIZE }
@@ -143,7 +143,7 @@ impl Default for HalConfig {
             device_scan_timeout_ms: defaults::device_scan_timeout_ms(),
             simulator: Some(crate::hal::simulator::SimulatorConfig::default()),
             usb: None,
-            serial: None,
+            //serial: None,
         }
     }
 }

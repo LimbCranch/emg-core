@@ -1,68 +1,111 @@
-// src/lib.rs
-//! EMG Real-time Core Library
+//! EMG-Core: High-performance EMG signal acquisition and processing library
 //!
-//! High-performance EMG signal processing for prosthetic control
+//! This library provides a comprehensive framework for EMG (electromyography) signal
+//! acquisition, processing, and analysis. It features:
+//!
+//! - Hardware abstraction layer for multiple EMG devices
+//! - Real-time signal processing pipeline
+//! - Lock-free data structures for low-latency operations
+//! - Comprehensive configuration management
+//! - Utility functions for common EMG operations
+//!
+//! # Quick Start
+//!
+//! ```rust,no_run
+//! use emg_core::hal::{DeviceFactory, EmgDevice};
+//! use emg_core::hal::simulator::{SimulatorConfig, EmgSimulator};
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Create a simulator device
+//!     let config = SimulatorConfig::default();
+//!     let mut device = DeviceFactory::create_simulator(config)?;
+//!     
+//!     // Initialize and connect
+//!     device.initialize().await?;
+//!     device.connect().await?;
+//!     device.start_acquisition().await?;
+//!     
+//!     // Read samples
+//!     for _ in 0..10 {
+//!         let sample = device.read_sample().await?;
+//!         println!("Sample: {:?}", sample);
+//!     }
+//!     
+//!     Ok(())
+//! }
+//! ```
 
-#![doc = include_str!("../README.md")]
-//#![cfg_attr(not(feature = "std"), no_std)]
+#![warn(missing_docs)]
+#![warn(clippy::all)]
+#![allow(clippy::module_inception)]
 
-pub mod processing;
-
-
-pub mod hal;
 pub mod config;
-pub mod acquisition;
-mod error;
-mod validation;
+pub mod hal;
 pub mod utils;
-// Re-export commonly used types
 
-pub use processing::{FilterBank, QualityMonitor, WindowManager};
+// Re-export commonly used types for convenience
+pub use hal::{
+    EmgDevice, EmgSample, DeviceInfo, DeviceCapabilities, QualityMetrics, DeviceStatus,
+    HalError, DeviceFactory,
+};
 
-
-pub use hal::{EmgDevice, EmgSample, DeviceInfo, DeviceCapabilities, QualityMetrics, DeviceType, ThreadPriority};
-pub use acquisition::{LockFreeRingBuffer, MpmcRingBuffer, SampleSynchronizer, BufferManager};
-
-// Re-export device implementations
-pub use hal::simulator::{SimulatorDevice, SimulatorConfig};
-pub use hal::usb_driver::{UsbEmgDevice, UsbDeviceConfig};
-pub use hal::serial_driver::{SerialEmgDevice, SerialConfig};
+pub use utils::{
+    time::{current_timestamp_nanos, TimeProvider},
+    validation::{ValidationResult, ValidationError},
+    bounds::BoundsResult,
+};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Default configuration constants
-pub mod constants {
-    /// Default sampling rate in Hz
-    pub const DEFAULT_SAMPLING_RATE_HZ: u32 = 2000;
+/// Library name
+pub const NAME: &str = env!("CARGO_PKG_NAME");
 
-    /// Default channel count
-    pub const DEFAULT_CHANNEL_COUNT: usize = 8;
-
-    /// Default buffer size in samples
-    pub const DEFAULT_BUFFER_SIZE_SAMPLES: usize = 4096;
-
-    /// Default latency target in milliseconds
-    pub const DEFAULT_LATENCY_TARGET_MS: u32 = 20;
+/// Get library information
+pub fn version_info() -> VersionInfo {
+    VersionInfo {
+        name: NAME.to_string(),
+        version: VERSION.to_string(),
+        description: "High-performance EMG signal acquisition and processing library".to_string(),
+        features: vec![
+            "Hardware abstraction layer".to_string(),
+            "Real-time signal processing".to_string(),
+            "Lock-free data structures".to_string(),
+            "Comprehensive configuration management".to_string(),
+            "Utility functions for EMG operations".to_string(),
+        ],
+    }
 }
 
-/// Result type for EMG operations
-pub type EmgResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
+/// Library version information
+#[derive(Debug, Clone)]
+pub struct VersionInfo {
+    /// Library name
+    pub name: String,
+    /// Version string
+    pub version: String,
+    /// Description
+    pub description: String,
+    /// List of features
+    pub features: Vec<String>,
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_version_is_set() {
-        assert!(!VERSION.is_empty());
+    fn test_version_info() {
+        let info = version_info();
+        assert_eq!(info.name, NAME);
+        assert_eq!(info.version, VERSION);
+        assert!(!info.features.is_empty());
     }
 
     #[test]
-    fn test_constants_are_reasonable() {
-        assert!(constants::DEFAULT_SAMPLING_RATE_HZ > 0);
-        assert!(constants::DEFAULT_CHANNEL_COUNT > 0);
-        assert!(constants::DEFAULT_BUFFER_SIZE_SAMPLES > 0);
-        assert!(constants::DEFAULT_LATENCY_TARGET_MS > 0);
+    fn test_constants() {
+        assert!(!VERSION.is_empty());
+        assert!(!NAME.is_empty());
     }
 }

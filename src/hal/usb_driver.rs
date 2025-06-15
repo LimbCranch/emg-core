@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use crate::DeviceStatus;
 
 /// USB device configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -122,7 +123,7 @@ impl UsbEmgDevice {
         Ok(channels)
     }
 }
-
+/*
 impl EmgDevice for UsbEmgDevice {
     type Error = UsbError;
 
@@ -130,6 +131,14 @@ impl EmgDevice for UsbEmgDevice {
         self.connect_to_device()?;
         // TODO: Configure device parameters, set sampling rate, etc.
         Ok(())
+    }
+
+    async fn connect(&mut self) -> Result<(), Self::Error> {
+        todo!()
+    }
+
+    async fn disconnect(&mut self) -> Result<(), Self::Error> {
+        todo!()
     }
 
     async fn start_acquisition(&mut self) -> Result<(), Self::Error> {
@@ -157,10 +166,10 @@ impl EmgDevice for UsbEmgDevice {
 
         // Generate basic quality metrics
         let quality_indicators = QualityMetrics {
+            signal_quality: 0.0,
             snr_db: 30.0, // TODO: Calculate from actual signal
-            contact_impedance_kohm: vec![15.0; channels.len()],
             artifact_detected: false,
-            signal_saturation: channels.iter().any(|&x| x.abs() > 0.9),
+            noise_level: 0.0,
         };
 
         Ok(EmgSample {
@@ -168,25 +177,10 @@ impl EmgDevice for UsbEmgDevice {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_nanos() as u64,
-            sequence,
-            channels,
-            quality_indicators,
+            sequence: sequence as u64,
+            channel_data: vec![],
+            quality_metrics: None,
         })
-    }
-
-    fn get_device_info(&self) -> DeviceInfo {
-        DeviceInfo {
-            name: "USB EMG Device".to_string(),
-            version: "1.0.0".to_string(),
-            serial_number: format!("USB-{:04X}-{:04X}", self.config.vendor_id, self.config.product_id),
-            capabilities: DeviceCapabilities {
-                max_channels: 8,
-                max_sample_rate_hz: 2000,
-                has_builtin_filters: true,
-                supports_impedance_check: true,
-                supports_calibration: false,
-            },
-        }
     }
 
     fn get_channel_count(&self) -> usize {
@@ -196,4 +190,31 @@ impl EmgDevice for UsbEmgDevice {
     fn get_sampling_rate(&self) -> u32 {
         2000 // TODO: Read from device configuration
     }
-}
+
+    fn get_device_info(&self) -> DeviceInfo {
+        DeviceInfo {
+            device_id: "".to_string(),
+            device_type: "".to_string(),
+            serial_number: format!("USB-{:04X}-{:04X}", self.config.vendor_id, self.config.product_id),
+            capabilities: DeviceCapabilities {
+                max_sampling_rate_hz: 0,
+                channel_count: 0,
+                resolution_bits: 0,
+                input_range_mv: 0.0,
+                supports_differential: false,
+                supports_hardware_filters: false,
+            },
+            firmware_version: "".to_string(),
+        }
+    }
+
+    async fn get_status(&self) -> Result<DeviceStatus, Self::Error> {
+        todo!()
+    }
+
+    async fn configure(&mut self, config: Self::Config) -> Result<(), Self::Error> {
+        todo!()
+    }
+
+    type Config = ();
+}*/

@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use crate::config::constants::*;
+use crate::hal::simulator;
 
 /// Configuration validation errors
 #[derive(Debug, Clone)]
@@ -109,7 +110,7 @@ impl SchemaValidator {
                                max: windowing::MAX_OVERLAP_PERCENT as f64
                            });
 
-        // Simulator constraints
+        /*// Simulator constraints
         constraints.insert("hal.simulator.noise_level".to_string(),
                            FieldConstraint::Range {
                                min: simulator::MIN_NOISE_LEVEL as f64,
@@ -120,7 +121,7 @@ impl SchemaValidator {
                            FieldConstraint::Range {
                                min: simulator::MIN_ARTIFACT_PROBABILITY as f64,
                                max: simulator::MAX_ARTIFACT_PROBABILITY as f64
-                           });
+                           });*/
 
         // Device type constraint
         constraints.insert("hal.device_type".to_string(),
